@@ -6,8 +6,8 @@ import padasip as pa
 
 from FilterClass import AdaptiveFilter
 
-
 DATA_DIR = "data/series/"
+
 
 def get_data(ticker):
     filename = f"{DATA_DIR}/{ticker}_dividends.csv"
