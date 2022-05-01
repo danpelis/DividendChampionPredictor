@@ -1,12 +1,16 @@
-import csv
+import argparse, csv
 
 import matplotlib.pyplot as plt
 import numpy as np
 import padasip as pa
 
-from FilterUtils import Filter
+from FilterClass import AdaptiveFilter
 
-def get_data(filename):
+DATA_DIR = "data/series/"
+
+
+def get_data(ticker):
+    filename = f"{DATA_DIR}/{ticker}_dividends.csv"
     data = []
     with open(filename, newline='') as csvfile:
         reader = csv.reader(csvfile, delimiter=',')
@@ -15,8 +19,7 @@ def get_data(filename):
             data.append(float(row[1]))
     return np.array(data)
 
-def plot_filter_result(pred: np.ndarray, actual: np.ndarray, error: np.ndarray, n: int,
-                       mu_val: str='0.05'):
+def plot_filter_result(pred: np.ndarray, actual: np.ndarray, error: np.ndarray, n: int, mu_val: str='0.05'):
     _avg_error = round(np.mean(10*np.log10(error[: (len(error) - n)]**2)), 2)
     plt.figure(figsize=(15, 20))
     plt.subplot(411)
@@ -34,7 +37,7 @@ def plot_filter_result(pred: np.ndarray, actual: np.ndarray, error: np.ndarray, 
     plt.show()
     return None
 
-def create_filter(data, n, filter_type='NLMS'):
+def create_filter(data, n, plot, filter_type='NLMS'):
     x = np.squeeze(pa.input_from_history(data, n)) # Input matrix
     N = len(x)
     d = np.zeros(N) # Intialize target with empty values
@@ -43,7 +46,7 @@ def create_filter(data, n, filter_type='NLMS'):
         # Fill target with our desired values
         d[i] = data[k+1]
 
-    f = Filter(n=n)
+    f = AdaptiveFilter(n=n, mu=0)
 
     errors_e, mu_range = f.explore_learning(d, x,
                 mu_start=0.01,
@@ -56,13 +59,25 @@ def create_filter(data, n, filter_type='NLMS'):
     f = pa.filters.AdaptiveFilter(model=filter_type, n=n, mu=best_mu, w="random")
     y, e, w = f.run(d, x)
 
-    plot_filter_result(pred=y, actual=d, error=e, mu_val=best_mu, n=n)
+    if plot:
+        plot_filter_result(pred=y, actual=d, error=e, mu_val=best_mu, n=n)
 
     return  y, e, w 
 
 
 if __name__ == '__main__':
     n=5
-    data =  get_data('data/series/CAT_dividends.csv')
-    y, e, w = create_filter(data, n, filter_type='NLMS')
-    print(f'Prediction:\t{y[-1]}\nAvg. Error:\t{round(np.mean(10*np.log10(e[: (len(e) - n)]**2)), 2)}')
+    parser = argparse.ArgumentParser(description="Fit and predict adaptive filter on a given Stock's dividend data")
+    parser.add_argument('-t', '--ticker', type=str, required=True, help='Stock ticker to fit filter')
+    parser.add_argument('-n',  type=int, default=5, help='Number of periods (dividend yields) given to filter')
+    parser.add_argument('-f', '--filter_type',  type=str, default='NLMS', help='Type of filter')
+    parser.add_argument('-p', '--show_plot',  action="store_true", default=False, help='Boolean to control the display of the output plots')
+    args = parser.parse_args() 
+
+
+    if args.filter_type not in pa.filters.FILTERS.keys():
+        raise Exception(f"Invalid Filter Type! Must be in {pa.filters.FILTERS.keys()}")
+
+    data = get_data(args.ticker)
+    y, e, w = create_filter(data, args.n, args.show_plot, args.filter_type)
+    print(f'Prediction:\t$ {y[-1]:.2f}\nAvg. Error:\t{round(np.mean(10*np.log10(e[: (len(e) - n)]**2)), 2)}')
