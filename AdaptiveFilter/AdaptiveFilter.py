@@ -6,7 +6,7 @@ import padasip as pa
 
 from FilterClass import AdaptiveFilter
 
-DATA_DIR = "data/series/"
+DATA_DIR = "../data/series/"
 
 
 def get_data(ticker):
